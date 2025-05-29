@@ -1,7 +1,8 @@
 <?php
+session_start();
 require_once '../db_connect.php';
 require_once '../user_functions.php';
-require_once '../buyer_manager.php';
+require_once 'buyer_manager.php';
 checkBuyer();
 $buyer = new BuyerManager($pdo, $_SESSION['user_id']);
 $filters = [
@@ -30,13 +31,69 @@ $cart_count = count($buyer->getCart());
     <script src="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@9/swiper-bundle.min.css">
     <style>
-        .product-card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
-        .product-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
-        .hero { background: linear-gradient(135deg, #714315, #5a330f); }
+        .product-card {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            border-radius: 12px;
+            border: 2px solid transparent;
+            background: white;
+        }
+        .product-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+            border-image: linear-gradient(45deg, #714315, #5a330f) 1;
+        }
+        .product-image {
+            height: 200px;
+            object-fit: cover;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+        }
+        .badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+        .badge.sale { background: #ef4444; }
+        .badge.rent { background: #3b82f6; }
+        .quick-view {
+            opacity: 0;
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: opacity 0.3s ease;
+        }
+        .product-card:hover .quick-view { opacity: 1; }
+        .hero {
+            background: linear-gradient(135deg, #714315, #5a330f);
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1), transparent);
+            animation: rotate 20s linear infinite;
+        }
+        @keyframes rotate {
+            100% { transform: rotate(360deg); }
+        }
         @media (max-width: 768px) {
             #sidebar { transform: translateX(-100%); }
             #sidebar.open { transform: translateX(0); }
             .main-content { margin-left: 0 !important; }
+            .product-image { height: 150px; }
         }
     </style>
 </head>
@@ -57,7 +114,7 @@ $cart_count = count($buyer->getCart());
                 <a href="cart.php" class="flex items-center p-4 hover:bg-[#5a330f] relative">
                     <i class="fas fa-shopping-cart mr-2"></i>
                     <span>Cart</span>
-                    <span class="absolute right-4 bg-red-500 text-white rounded-full px-2 py-1 text-xs"><?php echo $cart_count; ?></span>
+                    <span id="cart-count" class="absolute right-4 bg-red-500 text-white rounded-full px-2 py-1 text-xs"><?php echo $cart_count; ?></span>
                 </a>
                 <a href="orders.php" class="flex items-center p-4 hover:bg-[#5a330f]">
                     <i class="fas fa-box mr-2"></i>
@@ -90,13 +147,10 @@ $cart_count = count($buyer->getCart());
                 </div>
             </header>
             <main class="p-6">
-                <!-- Hero Section -->
-                <div class="hero text-white rounded-lg p-8 mb-6">
+                <div class="hero text-white rounded-lg p-8 mb-6 relative z-10">
                     <h1 class="text-3xl font-bold">Welcome to CampusPlug!</h1>
-                    <p class="text-lg">Discover amazing deals on campus essentials.</p>
+                    <p class="text-lg">Discover amazing deals on campus essentials in MWK.</p>
                 </div>
-
-                <!-- Filters -->
                 <div x-data="{ filters: <?php echo json_encode($filters); ?> }" class="bg-white rounded-lg shadow p-6 mb-6">
                     <form id="filter-form" class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
@@ -104,7 +158,9 @@ $cart_count = count($buyer->getCart());
                             <select name="category_id" x-model="filters.category_id" class="w-full p-2 border rounded">
                                 <option value="">All</option>
                                 <?php foreach ($categories as $category): ?>
-                                    <option value="<?php echo $category['category_id']; ?>"><?php echo htmlspecialchars($category['name']); ?></option>
+                                    <option value="<?php echo $category['category_id']; ?>" <?php echo $filters['category_id'] == $category['category_id'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($category['name']); ?>
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -112,15 +168,15 @@ $cart_count = count($buyer->getCart());
                             <label class="block text-sm font-medium">Listing Type</label>
                             <select name="listing_type" x-model="filters.listing_type" class="w-full p-2 border rounded">
                                 <option value="">All</option>
-                                <option value="sale">Sale</option>
-                                <option value="rent">Rent</option>
+                                <option value="sale" <?php echo $filters['listing_type'] == 'sale' ? 'selected' : ''; ?>>Sale</option>
+                                <option value="rent" <?php echo $filters['listing_type'] == 'rent' ? 'selected' : ''; ?>>Rent</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium">Price Range</label>
+                            <label class="block text-sm font-medium">Price Range (MWK)</label>
                             <div class="flex space-x-2">
-                                <input type="number" name="price_min" x-model="filters.price_min" placeholder="Min" class="w-1/2 p-2 border rounded">
-                                <input type="number" name="price_max" x-model="filters.price_max" placeholder="Max" class="w-1/2 p-2 border rounded">
+                                <input type="number" name="price_min" x-model="filters.price_min" placeholder="Min" class="w-1/2 p-2 border rounded" min="0">
+                                <input type="number" name="price_max" x-model="filters.price_max" placeholder="Max" class="w-1/2 p-2 border rounded" min="0">
                             </div>
                         </div>
                         <div>
@@ -129,51 +185,65 @@ $cart_count = count($buyer->getCart());
                         </div>
                     </form>
                 </div>
-
-                <!-- Products Grid -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <?php foreach ($products as $product): ?>
-                        <div class="bg-white rounded-lg shadow p-4 product-card">
-                            <img src="<?php echo htmlspecialchars($product['image_url']); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>" class="w-full h-40 object-cover rounded mb-4">
-                            <h3 class="text-lg font-semibold"><?php echo htmlspecialchars($product['name']); ?></h3>
-                            <p class="text-sm text-gray-600"><?php echo htmlspecialchars($product['category'] ?: 'N/A'); ?></p>
-                            <p class="text-lg font-bold">$<?php echo number_format($product['price'], 2); ?></p>
-                            <p class="text-sm"><?php echo htmlspecialchars($product['listing_type']); ?></p>
-                            <button class="add-to-cart bg-blue-500 text-white px-4 py-2 rounded mt-2 w-full hover:bg-blue-600" 
-                                    data-id="<?php echo $product['product_id']; ?>" 
-                                    data-type="<?php echo $product['listing_type']; ?>">
-                                Add to Cart
-                            </button>
+                    <?php if (empty($products)): ?>
+                        <div class="col-span-full text-center p-6 bg-white rounded-lg shadow">
+                            <p class="text-gray-600">No products found. <a href="dashboard.php" class="text-blue-500 hover:underline">Clear Filters</a></p>
                         </div>
-                    <?php endforeach; ?>
-                </div>
-
-                <!-- Featured Products Carousel -->
-                <div class="mt-6">
-                    <h3 class="text-xl font-semibold mb-4">Featured Products</h3>
-                    <div class="swiper-container">
-                        <div class="swiper-wrapper">
-                            <?php foreach ($products as $product): ?>
-                                <div class="swiper-slide">
-                                    <div class="bg-white rounded-lg shadow p-4">
-                                        <img src="<?php echo htmlspecialchars($product['image_url']); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>" class="w-full h-40 object-cover rounded mb-4">
-                                        <h3 class="text-lg font-semibold"><?php echo htmlspecialchars($product['name']); ?></h3>
-                                        <p class="text-lg font-bold">$<?php echo number_format($product['price'], 2); ?></p>
+                    <?php else: ?>
+                        <?php foreach ($products as $product): ?>
+                            <div class="product-card">
+                                <img src="<?php echo htmlspecialchars($product['image_url']); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>" class="product-image w-full">
+                                <div class="p-4">
+                                    <h3 class="text-xl font-bold text-gray-800"><?php echo htmlspecialchars($product['name']); ?></h3>
+                                    <p class="text-sm text-gray-500"><?php echo htmlspecialchars($product['category'] ?: 'N/A'); ?></p>
+                                    <p class="text-lg font-semibold text-yellow-600">K<?php echo number_format($product['price'] * 1750, 0, '', ','); ?></p>
+                                    <p class="text-sm text-gray-600">In Stock</p>
+                                    <span class="badge <?php echo $product['listing_type']; ?>">
+                                        <?php echo ucfirst($product['listing_type']); ?>
+                                    </span>
+                                    <div class="mt-3 flex space-x-2">
+                                        <button class="add-to-cart bg-blue-600 text-white px-4 py-2 rounded w-full hover:bg-blue-700 transition-colors" 
+                                                data-product-id="<?php echo $product['product_id']; ?>" 
+                                                data-listing-type="<?php echo $product['listing_type']; ?>">
+                                            <span class="cart-text">Add to Cart</span>
+                                            <span class="cart-loading hidden"><i class="fas fa-spinner fa-spin"></i> Adding...</span>
+                                        </button>
+                                        <button class="quick-view bg-gray-200 text-gray-700 px-3 py-2 rounded hover:bg-gray-300" 
+                                                data-product-id="<?php echo $product['product_id']; ?>">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
                                     </div>
                                 </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <div class="swiper-button-next"></div>
-                        <div class="swiper-button-prev"></div>
-                    </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
+                <?php if (!empty($products)): ?>
+                    <div class="mt-8">
+                        <h3 class="text-2xl font-semibold mb-4">Featured Products</h3>
+                        <div class="swiper-container">
+                            <div class="swiper-wrapper">
+                                <?php foreach ($products as $product): ?>
+                                    <div class="swiper-slide">
+                                        <div class="bg-white rounded-lg shadow p-4">
+                                            <img src="<?php echo htmlspecialchars($product['image_url']); ?>" alt="<?php echo htmlspecialchars($product['name']); ?>" class="w-full h-40 object-cover rounded mb-4">
+                                            <h3 class="text-lg font-semibold"><?php echo htmlspecialchars($product['name']); ?></h3>
+                                            <p class="text-lg font-bold text-yellow-600">K<?php echo number_format($product['price'] * 1750, 0, '', ','); ?></p>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <div class="swiper-button-next"></div>
+                            <div class="swiper-button-prev"></div>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </main>
         </div>
     </div>
-
     <script>
         $(document).ready(function() {
-            // Sidebar Toggle
             $('#toggle-sidebar').click(function() {
                 const sidebar = $('#sidebar');
                 const mainContent = $('#main-content');
@@ -183,38 +253,41 @@ $cart_count = count($buyer->getCart());
                 sidebar.find('h1').toggleClass('hidden', !collapsed);
                 mainContent.toggleClass('ml-64 ml-20');
             });
-
-            // Mobile Sidebar Toggle
             $('#mobile-menu').click(function() {
                 $('#sidebar').toggleClass('open');
             });
-
-            // Profile Dropdown
             $('#profile-toggle').click(function() {
                 $('#profile-dropdown').toggleClass('hidden');
             });
-
-            // Filter Form
             $('#filter-form').on('change input', function() {
                 const data = $(this).serialize();
                 window.location.href = 'dashboard.php?' + data;
             });
-
-            // Add to Cart
             $('.add-to-cart').click(function() {
-                const product_id = $(this).data('id');
-                const listing_type = $(this).data('type');
-                $.post('cart_actions.php', { action: 'add', product_id: product_id, quantity: 1, listing_type: listing_type }, function(response) {
+                const button = $(this);
+                const product_id = button.data('product-id');
+                const listing_type = button.data('listing-type');
+                button.find('.cart-text').addClass('hidden');
+                button.find('.cart-loading').removeClass('hidden');
+                $.post('/campusplug/buyer/cart_actions.php', { action: 'add', product_id: product_id, quantity: 1, listing_type: listing_type }, function(response) {
                     if (response.success) {
-                        Toastify({ text: response.message, backgroundColor: '#2ecc71' }).showToast();
-                        location.reload();
+                        $('#cart-count').text(response.cart_count);
+                        Toastify({ text: response.message, backgroundColor: '#2ecc71', duration: 3000 }).showToast();
                     } else {
-                        Toastify({ text: response.message, backgroundColor: '#e74c3c' }).showToast();
+                        Toastify({ text: response.message || 'Failed to add to cart', backgroundColor: '#e74c3c', duration: 3000 }).showToast();
                     }
+                }, 'json').fail(function(jqXHR, textStatus, errorThrown) {
+                    console.error('AJAX error:', textStatus, errorThrown, jqXHR.responseText);
+                    Toastify({ text: 'Error connecting to server: ' + textStatus, backgroundColor: '#e74c3c', duration: 3000 }).showToast();
+                }).always(function() {
+                    button.find('.cart-text').removeClass('hidden');
+                    button.find('.cart-loading').addClass('hidden');
                 });
             });
-
-            // Swiper Carousel
+            $('.quick-view').click(function() {
+                const product_id = $(this).data('product-id');
+                Toastify({ text: `Quick view for product ${product_id} (coming soon)`, backgroundColor: '#3b82f6', duration: 3000 }).showToast();
+            });
             new Swiper('.swiper-container', {
                 slidesPerView: 1,
                 spaceBetween: 10,
@@ -225,6 +298,11 @@ $cart_count = count($buyer->getCart());
                 breakpoints: {
                     640: { slidesPerView: 2 },
                     1024: { slidesPerView: 4 },
+                },
+                loop: <?php echo empty($products) ? 'false' : 'true'; ?>,
+                autoplay: {
+                    delay: 5000,
+                    disableOnInteraction: false,
                 }
             });
         });
