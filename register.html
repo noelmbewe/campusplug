@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusPlug Register</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div class="bg-white p-8 rounded shadow-md w-full max-w-md">
+        <h2 class="text-2xl font-bold mb-6 text-center">Register for CampusPlug</h2>
+        <form id="register-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium">Email</label>
+                <input type="email" id="email" class="w-full p-2 border rounded" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Password</label>
+                <input type="password" id="password" class="w-full p-2 border rounded" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Role</label>
+                <select id="role" class="w-full p-2 border rounded">
+                    <option value="buyer">Buyer</option>
+                    <option value="vendor">Vendor</option>
+                </select>
+            </div>
+            <div id="vendor-fields" class="hidden">
+                <label class="block text-sm font-medium">Student ID</label>
+                <input type="text" id="student_id" class="w-full p-2 border rounded">
+            </div>
+            <button type="submit" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Register</button>
+        </form>
+        <p class="mt-4 text-center">Already have an account? <a href="login.html" class="text-blue-500 hover:underline">Login</a></p>
+        <p id="error" class="text-red-500 text-center mt-4 hidden"></p>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('#role').change(function() {
+                if ($(this).val() === 'vendor') {
+                    $('#vendor-fields').removeClass('hidden');
+                    $('#student_id').prop('required', true);
+                } else {
+                    $('#vendor-fields').addClass('hidden');
+                    $('#student_id').prop('required', false);
+                }
+            });
+
+            $('#register-form').submit(function(e) {
+                e.preventDefault();
+                $.post('register.php', {
+                    email: $('#email').val(),
+                    password: $('#password').val(),
+                    role: $('#role').val(),
+                    student_id: $('#student_id').val()
+                }, function(response) {
+                    if (response.success) {
+                        alert('Registration successful! Please log in.');
+                        window.location.href = 'login.html';
+                    } else {
+                        $('#error').text(response.error).removeClass('hidden');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

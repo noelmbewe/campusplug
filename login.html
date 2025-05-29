@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusPlug Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div class="bg-white p-8 rounded shadow-md w-full max-w-md">
+        <h2 class="text-2xl font-bold mb-6 text-center">Login to CampusPlug</h2>
+        <form id="login-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium">Email</label>
+                <input type="email" id="email" class="w-full p-2 border rounded" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Password</label>
+                <input type="password" id="password" class="w-full p-2 border rounded" required>
+            </div>
+            <button type="submit" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Login</button>
+        </form>
+        <p class="mt-4 text-center">Don't have an account? <a href="register.html" class="text-blue-500 hover:underline">Register</a></p>
+        <p id="error" class="text-red-500 text-center mt-4 hidden"></p>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('#login-form').submit(function(e) {
+                e.preventDefault();
+                $.post('login.php', {
+                    email: $('#email').val(),
+                    password: $('#password').val()
+                }, function(response) {
+                    if (response.success) {
+                        if (response.role === 'admin') {
+                            window.location.href = 'admin/admin_dashboard.html';
+                        } else if (response.role === 'vendor') {
+                            window.location.href = 'vendor/dashboard.html'; // Placeholder
+                        } else {
+                            window.location.href = 'buyer/dashboard.html'; // Placeholder
+                        }
+                    } else {
+                        $('#error').text(response.error).removeClass('hidden');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

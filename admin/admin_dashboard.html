@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusPlug Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body class="bg-gray-100 flex h-screen">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-[#714315] text-white h-full fixed">
+        <div class="p-4">
+            <h1 class="text-2xl font-bold">CampusPlug Admin</h1>
+        </div>
+        <nav class="mt-4">
+            <ul>
+                <li><a href="#users" class="block p-4 hover:bg-[#5a330f] menu-item">Users</a></li>
+                <li><a href="#vendors" class="block p-4 hover:bg-[#5a330f] menu-item">Vendors</a></li>
+                <li><a href="#listings" class="block p-4 hover:bg-[#5a330f] menu-item">Listings</a></li>
+                <li><a href="#reports" class="block p-4 hover:bg-[#5a330f] menu-item">Reports</a></li>
+                <li><a href="#stats" class="block p-4 hover:bg-[#5a330f] menu-item">Stats</a></li>
+                <li><a href="#settings" class="block p-4 hover:bg-[#5a330f] menu-item">Settings</a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 ml-64">
+        <!-- Navbar -->
+        <header class="bg-white shadow p-4 flex justify-between items-center">
+            <h2 class="text-xl font-semibold">Admin Dashboard</h2>
+            <div>
+                <span id="admin-email" class="mr-4">Loading...</span>
+                <button id="logout" class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="p-6">
+            <div id="content" class="bg-white rounded shadow p-6">
+                <h3 class="text-lg font-semibold mb-4">Select an option from the sidebar</h3>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            // Check if admin is logged in
+            $.get('../api/get_session.php', function(data) {
+                if (!data.isLoggedIn || data.role !== 'admin') {
+                    window.location.href = '../login.html';
+                } else {
+                    $('#admin-email').text(data.email);
+                }
+            });
+
+            // Logout
+            $('#logout').click(function() {
+                $.post('../logout.php', function(response) {
+                    if (response.success) {
+                        window.location.href = '../login.html';
+                    }
+                });
+            });
+
+            // Menu item click handler
+            $('.menu-item').click(function(e) {
+                e.preventDefault();
+                const section = $(this).attr('href').substring(1);
+                loadSection(section);
+            });
+
+            function loadSection(section) {
+                $('#content').html('<p>Loading...</p>');
+                switch (section) {
+                    case 'users':
+                        $.get('api/get_users.php', function(data) {
+                            let html = '<h3 class="text-lg font-semibold mb-4">Users</h3>';
+                            html += '<table class="w-full border"><thead><tr class="bg-gray-200"><th class="p-2">ID</th><th>Email</th><th>Role</th><th>Status</th><th>Created At</th><th>Actions</th></tr></thead><tbody>';
+                            data.forEach(user => {
+                                html += `<tr><td class="p-2">${user.user_id}</td><td>${user.email}</td><td>${user.role}</td><td>${user.status}</td><td>${user.created_at}</td><td><button class="bg-red-500 text-white px-2 py-1 rounded suspend-user" data-id="${user.user_id}" data-status="${user.status === 'active' ? 'suspended' : 'active'}">${user.status === 'active' ? 'Suspend' : 'Reactivate'}</button></td></tr>`;
+                            });
+                            html += '</tbody></table>';
+                            $('#content').html(html);
+                            $('.suspend-user').click(function() {
+                                $.post('api/suspend_user.php', {
+                                    user_id: $(this).data('id'),
+                                    status: $(this).data('status')
+                                }, function(response) {
+                                    alert(response.success ? 'User status updated' : 'Error updating user');
+                                    loadSection('users');
+                                });
+                            });
+                        });
+                        break;
+                    case 'vendors':
+                        $.get('api/get_users.php', function(data) {
+                            let html = '<h3 class="text-lg font-semibold mb-4">Vendors</h3>';
+                            html += '<table class="w-full border"><thead><tr class="bg-gray-200"><th class="p-2">ID</th><th>Email</th><th>Action</th></tr></thead><tbody>';
+                            data.filter(user => user.role === 'vendor').forEach(user => {
+                                html += `<tr><td class="p-2">${user.user_id}</td><td>${user.email}</td><td><button class="bg-blue-500 text-white px-2 py-1 rounded view-vendor" data-id="${user.user_id}">View Details</button></td></tr>`;
+                            });
+                            html += '</tbody></table>';
+                            $('#content').html(html);
+                            $('.view-vendor').click(function() {
+                                const vendorId = $(this).data('id');
+                                $.get(`api/get_vendor.php?vendor_id=${vendorId}`, function(vendor) {
+                                    if (vendor.error) {
+                                        $('#content').html(`<p class="text-red-500">${vendor.error}</p>`);
+                                        return;
+                                    }
+                                    let html = `<h3 class="text-lg font-semibold mb-4">Vendor Details</h3>`;
+                                    html += `<p><strong>Name:</strong> ${vendor.name}</p>`;
+                                    html += `<p><strong>Email:</strong> ${vendor.email}</p>`;
+                                    html += `<p><strong>Student ID:</strong> ${vendor.student_id}</p>`;
+                                    html += `<p><strong>Bio:</strong> ${vendor.bio || 'N/A'}</p>`;
+                                    html += `<p><strong>Contact:</strong> ${vendor.contact_number || 'N/A'}</p>`;
+                                    html += `<p><strong>Verified:</strong> ${vendor.verified ? 'Yes' : 'No'}</p>`;
+                                    html += `<button class="bg-green-500 text-white px-4 py-2 rounded verify-vendor" data-id="${vendor.vendor_id}" data-verified="${vendor.verified ? 0 : 1}">
+                                        ${vendor.verified ? 'Unverify' : 'Verify'}</button>`;
+                                    $('#content').html(html);
+                                    $('.verify-vendor').click(function() {
+                                        $.post('api/verify_vendor.php', {
+                                            vendor_id: $(this).data('id'),
+                                            verified: $(this).data('verified')
+                                        }, function(response) {
+                                            alert(response.success ? 'Vendor updated' : 'Error updating vendor');
+                                            loadSection('vendors');
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                        break;
+                    case 'listings':
+                        $.get('api/get_listings.php', function(data) {
+                            let html = '<h3 class="text-lg font-semibold mb-4">Listings</h3>';
+                            html += '<table class="w-full border"><thead><tr class="bg-gray-200"><th class="p-2">ID</th><th>Name</th><th>Type</th><th>Price</th><th>Vendor</th><th>Action</th></tr></thead><tbody>';
+                            data.forEach(product => {
+                                html += `<tr><td class="p-2">${product.product_id}</td><td>${product.name}</td><td>${product.type}</td><td>${product.price}</td><td>${product.vendor_name}</td><td><button class="bg-red-500 text-white px-2 py-1 rounded remove-listing" data-id="${product.product_id}">Remove</button></td></tr>`;
+                            });
+                            html += '</tbody></table>';
+                            $('#content').html(html);
+                            $('.remove-listing').click(function() {
+                                $.post('api/remove_listing.php', { product_id: $(this).data('id') }, function(response) {
+                                    alert(response.success ? 'Listing removed' : 'Error removing listing');
+                                    loadSection('listings');
+                                });
+                            });
+                        });
+                        break;
+                    case 'reports':
+                        $.get('api/get_reports.php', function(data) {
+                            let html = '<h3 class="text-lg font-semibold mb-4">Reports</h3>';
+                            html += '<table class="w-full border"><thead><tr class="bg-gray-200"><th class="p-2">ID</th><th>Reporter</th><th>Target</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+                            data.forEach(report => {
+                                html += `<tr><td class="p-2">${report.report_id}</td><td>${report.reporter_email}</td><td>${report.target_type} ${report.target_id}</td><td>${report.reason}</td><td>${report.status}</td><td><button class="bg-green-500 text-white px-2 py-1 rounded resolve-report" data-id="${report.report_id}" data-status="resolved">Resolve</button> <button class="bg-red-500 text-white px-2 py-1 rounded resolve-report" data-id="${report.report_id}" data-status="dismissed">Dismiss</button></td></tr>`;
+                            });
+                            html += '</tbody></table>';
+                            $('#content').html(html);
+                            $('.resolve-report').click(function() {
+                                $.post('api/resolve_report.php', {
+                                    report_id: $(this).data('id'),
+                                    status: $(this).data('status')
+                                }, function(response) {
+                                    alert(response.success ? 'Report updated' : 'Error updating report');
+                                    loadSection('reports');
+                                });
+                            });
+                        });
+                        break;
+                    case 'stats':
+                        $.get('api/get_stats.php', function(data) {
+                            let html = '<h3 class="text-lg font-semibold mb-4">Platform Statistics</h3>';
+                            html += `<p><strong>Total Users:</strong> ${data.total_users}</p>`;
+                            html += `<p><strong>Total Vendors:</strong> ${data.total_vendors}</p>`;
+                            html += `<p><strong>Total Orders:</strong> ${data.total_orders}</p>`;
+                            html += `<p><strong>Total Products:</strong> ${data.total_products}</p>`;
+                            $('#content').html(html);
+                        });
+                        break;
+                    case 'settings':
+                        let html = '<h3 class="text-lg font-semibold mb-4">Settings</h3>';
+                        html += '<form id="add-category-form" class="space-y-4">';
+                        html += '<div><label class="block">Category Name</label><input type="text" id="category-name" class="border p-2 w-full"></div>';
+                        html += '<div><label class="block">Description</label><textarea id="category-description" class="border p-2 w-full"></textarea></div>';
+                        html += '<button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Add Category</button>';
+                        html += '</form>';
+                        $('#content').html(html);
+                        $('#add-category-form').submit(function(e) {
+                            e.preventDefault();
+                            $.post('api/add_category.php', {
+                                name: $('#category-name').val(),
+                                description: $('#category-description').val()
+                            }, function(response) {
+                                alert(response.success ? 'Category added' : 'Error adding category');
+                                $('#category-name').val('');
+                                $('#category-description').val('');
+                            });
+                        });
+                        break;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
